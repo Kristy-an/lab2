@@ -10,8 +10,9 @@ DATA_PACKET = b'D'
 END_PACKET = b'E'
 
 # Header format
-HEADER_FORMAT = '!cII'
+HEADER_FORMAT = '!cHIHIHIcII'
 BUFFER_SIZE = 4096
+PRIORITY = 0x01
 
 # Define the tracker filename
 TRACKER = 'tracker.txt'
@@ -84,12 +85,30 @@ if __name__ == '__main__':
                         help="port on which the requester waits for packets")
     parser.add_argument("-o", "--file", type=str,
                         help="the name of the file that is being requested")
+
+    parser.add_argument("-f", "--f_hostname", type=str,
+                        help="the hostname of the emulator")
+    parser.add_argument("-e", "--f_port", type=str,
+                        help="the port of the emulator")
+    parser.add_argument("-w", "--window", type=str,
+                        help="the requester's window size")
     args = parser.parse_args()
+
     # Process command line argument
     port = args.port
     filename = args.file
     listen_port = args.port
     listen_ip = '127.0.0.1'
+
+    f_hostname = args.f_hostname
+    f_port = args.f_port
+    window_size = args.window
+
+    # Header's parameters
+    src_ip_address = f_hostname
+    src_port = f_port
+    dest_ip_address = socket.gethostbyname()
+    dest_port = port
 
     # create a UDP socket and bind it to the specified address and port
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -105,7 +124,9 @@ if __name__ == '__main__':
 
         packet_type = b'R'
         length = len(payload)
-        header = struct.pack(HEADER_FORMAT, packet_type, seq_num, length)
+        length_outer = length + 9
+        header = struct.pack(HEADER_FORMAT, PRIORITY, src_ip_address, src_port, dest_ip_address, dest_port,
+                             packet_type, seq_num, length)
         packet = header + payload.encode()
 
         # receive data from each ports
@@ -139,13 +160,9 @@ if __name__ == '__main__':
 
                 # Print information & write data to file
                 if is_not_end:
-                    print_packet_type(time, response_type, ip, port, response_seq_num, response_length,
-                                      response_payload.decode()[:4])
                     f.write(response_payload)
                     data_packet_count += 1
                 else:
-                    print_packet_type(time, response_type, ip, port, response_seq_num, response_length,
-                                      response_payload.decode()[:4])
                     end_time = time
                     duration_ms = cal_milli_diff(start_time, end_time)
                     duration_sec = cal_second_diff(start_time, end_time)
