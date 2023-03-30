@@ -11,7 +11,7 @@ DATA_PACKET = b'D'
 END_PACKET = b'E'
 
 # Header format
-HEADER_FORMAT = '!cII'
+HEADER_FORMAT = '!cHIHIHIcII'
 
 
 def send_end_packet(seq_num, ip, port):
@@ -21,18 +21,18 @@ def send_end_packet(seq_num, ip, port):
     header = struct.pack(HEADER_FORMAT, packet_type, seq_num, length)
     packet = header
     sock.sendto(packet, (ip, port))
-    print("END Packet")
-    print("send time:        ", datetime.datetime.now())
-    print("requester addr:   ", ip, ":", port)
-    print("sequence num:     ", seq_num)
-    print("length:           ", length)
-    print("payload:          ", )
-    print("\n")
+    # print("END Packet")
+    # print("send time:        ", datetime.datetime.now())
+    # print("requester addr:   ", ip, ":", port)
+    # print("sequence num:     ", seq_num)
+    # print("length:           ", length)
+    # print("payload:          ", )
+    # print("\n")
 
 
 # Command line parameter
 parser = argparse.ArgumentParser()
-parser.add_argument("-p", "--listen", type=int,
+parser.add_argument("-p", "--port", type=int,
                     help="port on which the sender waits for requests")
 parser.add_argument("-g", "--send_to", type=int,
                     help="requester port: port on which the requester is waiting")
@@ -42,6 +42,15 @@ parser.add_argument("-q", "--seq_no", type=int,
                     help="seq_no: The initial sequence of the packet exchange")
 parser.add_argument("-l", "--length", type=int,
                     help="length: the length of the payload(in bytes) in the packets")
+
+parser.add_argument("-f", "--hostname", type=str,
+                    help="host name of the emulator")
+parser.add_argument("-e", "--emulator_port", type=int,
+                    help="The port of the emulator")
+parser.add_argument("-i", "--priority", type=int,
+                    help="The priority of the sent packets")
+parser.add_argument("-t", "--timeout", type=int,
+                    help="The timeout for retransmission for lost packets in the unit of milliseconds")
 args = parser.parse_args()
 
 # Limitation of command line parameter
@@ -52,19 +61,24 @@ if not (2049 < args.send_to < 65536):
     print("Error: Requester port number should be in the range of 2049 to 65536")
     sys.exit(1)
 
-
 # specify the IP address and port number of the receiver
-requester_ip = '127.0.0.1'
+port = args.port
 sendto_port = args.send_to
-listen_this_port = args.listen
 send_rate = args.rate
 payload_length = args.length
-seq_num = args.seq_no
+seq_num = 1
 rate = args.rate
+
+priority = args.priority
+hostname = args.hostname
+e_port = args.emulator_port
+timeout = args.timeout
+
 
 # create a UDP socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock.bind((requester_ip, listen_this_port))
+myIP = socket.gethostbyname(socket.gethostname())
+sock.bind((myIP, port))
 # print("sender is listening this port: ", listen_this_port, "\n")
 
 # receive packets
@@ -90,17 +104,12 @@ while True:
         packet_type = DATA_PACKET
         length = len(packet)
         payload = packet
-        header = struct.pack(HEADER_FORMAT, packet_type, seq_num, length)
+        length_outer = length + 17
+        header = struct.pack(HEADER_FORMAT, priority, myIP, port, hostname, sendto_port,
+                             packet_type, length_outer, seq_num, length)
         packet = header + payload
         sock.sendto(packet, (requester_ip, sendto_port))
-        print("DATA Packet")
-        print("send time:        ", datetime.datetime.now())
-        print("requester addr:   ", requester_ip, ":", sendto_port)
-        print("sequence num:     ", seq_num)
-        print("length:           ", length)
-        print("payload:          ", payload.decode()[:4])
-        print("\n")
-        seq_num = seq_num + length
+        seq_num = seq_num + 1
         time.sleep(1 / rate)
     send_end_packet(seq_num, requester_ip, sendto_port)
     sys.exit()
