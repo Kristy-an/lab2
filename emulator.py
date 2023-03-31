@@ -5,9 +5,11 @@ import datetime
 import time
 import sys
 
-#
+HEADER_FORMAT = '!cHIHIHIcII'
+
+
 def parse_static_table(filename, emulator_host, emulator_port):
-    """Parse the forwarding table file
+    """ Parse the forwarding table file
 
     Given a emulator's hostname and port number, only store the data related with this emulator.
 
@@ -37,6 +39,37 @@ def parse_static_table(filename, emulator_host, emulator_port):
             table[curr_emulator][destination] = {'next_hop': next_hop, 'delay': delay,
                                                  'loss_probability': loss_probability}
     return table
+
+
+def log(error_type, packet, logfile):
+    """ Log the error information, write them to the log file
+
+    :param error_type: type of the error
+    :param packet: the dropped packet
+    :param logfile: the file we need to write information in
+    :return: None
+    """
+    pp, src_ip, src_port, dest_ip, dest_port, outer_len, ptype, pseq_num, plength \
+        = struct.unpack(HEADER_FORMAT, packet[:26])
+    time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
+    error_message = ""
+
+    if error_type == "NOMATCH":
+        error_message = "no forwarding entry found"
+    elif error_type == "QFULL":
+        error_message = "priority queue " + pp + "was full"
+    elif error_type == "LOSS":
+        error_message = "loss event occurred."
+
+    with open(logfile) as file:
+        file.write(error_message + ", ")
+        file.write("Destination: " + dest_ip+" "+dest_ip + "， ")
+        file.write("Source: " + src_ip + " " + src_port)
+        file.write(", Time of loss: " + time)
+        file.write(", Priority: " + pp + "payload size: " + plength)
+        file.write("\n")
+    return
+
 
 
 # Command line parameter
